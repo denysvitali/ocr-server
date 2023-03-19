@@ -1,0 +1,478 @@
+{
+  "textBlocks": [
+    {
+      "text": "Receipt",
+      "lines": [
+        {
+          "text": "Receipt",
+          "angle": 0.0,
+          "confidence": 0.90290177,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 57,
+        "bottom": 90,
+        "left": 27,
+        "right": 178
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Account / Payable to",
+      "lines": [
+        {
+          "text": "Account / Payable to",
+          "angle": 0.0,
+          "confidence": 0.8880974,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 104,
+        "bottom": 121,
+        "left": 40,
+        "right": 227
+      },
+      "lang": "und"
+    },
+    {
+      "text": "CH39 0870 4016 0754 7300 7",
+      "lines": [
+        {
+          "text": "CH39 0870 4016 0754 7300 7",
+          "angle": 0.0,
+          "confidence": 0.9094122,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 126,
+        "bottom": 142,
+        "left": 41,
+        "right": 367
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Robert Schneider AG",
+      "lines": [
+        {
+          "text": "Robert Schneider AG",
+          "angle": 0.0,
+          "confidence": 0.8621324,
+          "recognizedLanguage": "de"
+        }
+      ],
+      "boundingBox": {
+        "top": 151,
+        "bottom": 168,
+        "left": 42,
+        "right": 264
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Rue du Lac 1268",
+      "lines": [
+        {
+          "text": "Rue du Lac 1268",
+          "angle": 0.0,
+          "confidence": 0.87597656,
+          "recognizedLanguage": "ro"
+        }
+      ],
+      "boundingBox": {
+        "top": 177,
+        "bottom": 194,
+        "left": 42,
+        "right": 220
+      },
+      "lang": "und"
+    },
+    {
+      "text": "2501 Biel",
+      "lines": [
+        {
+          "text": "2501 Biel",
+          "angle": 0.0,
+          "confidence": 0.87109375,
+          "recognizedLanguage": "fr"
+        }
+      ],
+      "boundingBox": {
+        "top": 204,
+        "bottom": 221,
+        "left": 41,
+        "right": 140
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Reference",
+      "lines": [
+        {
+          "text": "Reference",
+          "angle": 0.0,
+          "confidence": 0.91710067,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 242,
+        "bottom": 254,
+        "left": 41,
+        "right": 132
+      },
+      "lang": "und"
+    },
+    {
+      "text": "RF97 2020 0227 JS",
+      "lines": [
+        {
+          "text": "RF97 2020 0227 JS",
+          "angle": 0.0,
+          "confidence": 0.8038505,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 262,
+        "bottom": 281,
+        "left": 42,
+        "right": 245
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Payable by",
+      "lines": [
+        {
+          "text": "Payable by",
+          "angle": 0.0,
+          "confidence": 0.9201389,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 301,
+        "bottom": 317,
+        "left": 41,
+        "right": 139
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Pia-Maria Rutschmann-Schnyder\nGrosse Marktgasse 28",
+      "lines": [
+        {
+          "text": "Pia-Maria Rutschmann-Schnyder",
+          "angle": 0.0,
+          "confidence": 0.8558873,
+          "recognizedLanguage": "en"
+        },
+        {
+          "text": "Grosse Marktgasse 28",
+          "angle": 0.0,
+          "confidence": 0.90321183,
+          "recognizedLanguage": "de"
+        }
+      ],
+      "boundingBox": {
+        "top": 320,
+        "bottom": 367,
+        "left": 41,
+        "right": 392
+      },
+      "lang": "und"
+    },
+    {
+      "text": "9400 Rorschach",
+      "lines": [
+        {
+          "text": "9400 Rorschach",
+          "angle": 0.0,
+          "confidence": 0.9110577,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 373,
+        "bottom": 390,
+        "left": 41,
+        "right": 213
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Currency Amount\nCHF",
+      "lines": [
+        {
+          "text": "Currency Amount",
+          "angle": -0.7512629,
+          "confidence": 0.8886719,
+          "recognizedLanguage": "en"
+        },
+        {
+          "text": "CHF",
+          "angle": 0.0,
+          "confidence": 0.85026044,
+          "recognizedLanguage": "und-Latn"
+        }
+      ],
+      "boundingBox": {
+        "top": 549,
+        "bottom": 589,
+        "left": 35,
+        "right": 210
+      },
+      "lang": "und"
+    },
+    {
+      "text": "5923.50",
+      "lines": [
+        {
+          "text": "5923.50",
+          "angle": 0.0,
+          "confidence": 0.86439735,
+          "recognizedLanguage": "am"
+        }
+      ],
+      "boundingBox": {
+        "top": 574,
+        "bottom": 590,
+        "left": 142,
+        "right": 229
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Acceptance point",
+      "lines": [
+        {
+          "text": "Acceptance point",
+          "angle": 0.0,
+          "confidence": 0.8695313,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 661,
+        "bottom": 677,
+        "left": 281,
+        "right": 440
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Payment part",
+      "lines": [
+        {
+          "text": "Payment part",
+          "angle": 0.0,
+          "confidence": 0.918679,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 61,
+        "bottom": 89,
+        "left": 530,
+        "right": 755
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Currency Amount\nCHF",
+      "lines": [
+        {
+          "text": "Currency Amount",
+          "angle": 0.0,
+          "confidence": 0.9129464,
+          "recognizedLanguage": "en"
+        },
+        {
+          "text": "CHF",
+          "angle": 0.0,
+          "confidence": 0.8515625,
+          "recognizedLanguage": "und-Latn"
+        }
+      ],
+      "boundingBox": {
+        "top": 541,
+        "bottom": 578,
+        "left": 529,
+        "right": 700
+      },
+      "lang": "und"
+    },
+    {
+      "text": "5923.50",
+      "lines": [
+        {
+          "text": "5923.50",
+          "angle": 0.0,
+          "confidence": 0.9229911,
+          "recognizedLanguage": "am"
+        }
+      ],
+      "boundingBox": {
+        "top": 561,
+        "bottom": 577,
+        "left": 630,
+        "right": 717
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Account / Payable to\nCH39 0870 401l6 0754 7300 7\nRobert Schneider AG",
+      "lines": [
+        {
+          "text": "Account / Payable to",
+          "angle": 0.0,
+          "confidence": 0.90004593,
+          "recognizedLanguage": "en"
+        },
+        {
+          "text": "CH39 0870 401l6 0754 7300 7",
+          "angle": 0.0,
+          "confidence": 0.8547585,
+          "recognizedLanguage": "en"
+        },
+        {
+          "text": "Robert Schneider AG",
+          "angle": 0.0,
+          "confidence": 0.88327205,
+          "recognizedLanguage": "de"
+        }
+      ],
+      "boundingBox": {
+        "top": 72,
+        "bottom": 147,
+        "left": 929,
+        "right": 1296
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Rue du Lac 1268\n2501 Biel",
+      "lines": [
+        {
+          "text": "Rue du Lac 1268",
+          "angle": 0.0,
+          "confidence": 0.8645833,
+          "recognizedLanguage": "ro"
+        },
+        {
+          "text": "2501 Biel",
+          "angle": 0.0,
+          "confidence": 0.8491211,
+          "recognizedLanguage": "fr"
+        }
+      ],
+      "boundingBox": {
+        "top": 155,
+        "bottom": 203,
+        "left": 930,
+        "right": 1132
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Reference",
+      "lines": [
+        {
+          "text": "Reference",
+          "angle": 0.0,
+          "confidence": 0.93098956,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 224,
+        "bottom": 241,
+        "left": 931,
+        "right": 1052
+      },
+      "lang": "und"
+    },
+    {
+      "text": "RF97 2020 0227 JS",
+      "lines": [
+        {
+          "text": "RF97 2020 0227 JS",
+          "angle": 0.0,
+          "confidence": 0.81668526,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 252,
+        "bottom": 275,
+        "left": 931,
+        "right": 1160
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Payable by",
+      "lines": [
+        {
+          "text": "Payable by",
+          "angle": 0.5223592,
+          "confidence": 0.91015625,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 292,
+        "bottom": 316,
+        "left": 930,
+        "right": 1060
+      },
+      "lang": "und"
+    },
+    {
+      "text": "Pia-Maria Rutschmann-Schnyder\nGrosse Marktgasse 28\n9400 Rorschach",
+      "lines": [
+        {
+          "text": "Pia-Maria Rutschmann-Schnyder",
+          "angle": 0.0,
+          "confidence": 0.8666295,
+          "recognizedLanguage": "en"
+        },
+        {
+          "text": "Grosse Marktgasse 28",
+          "angle": 0.0,
+          "confidence": 0.921875,
+          "recognizedLanguage": "de"
+        },
+        {
+          "text": "9400 Rorschach",
+          "angle": 0.0,
+          "confidence": 0.8951322,
+          "recognizedLanguage": "en"
+        }
+      ],
+      "boundingBox": {
+        "top": 320,
+        "bottom": 401,
+        "left": 919,
+        "right": 1325
+      },
+      "lang": "und"
+    }
+  ],
+  "barcodes": [
+    {
+      "boundingBox": {
+        "top": 147,
+        "bottom": 458,
+        "left": 548,
+        "right": 860
+      },
+      "displayValue": "SPC\n0200\n1\nCH3908704016075473007\nK\nRobert Schneider AG\nRue du Lac 1268\n2501 Biel\n\n\nCH\n\n\n\n\n\n\n\n5923.50\nCHF\nK\nPia-Maria Rutschmann-Schnyder\nGrosse Marktgasse 28\n9400 Rorschach\n\n\nCH\nSCOR\nRF9720200227JS\n20200227JS- - \nEPD\n\n",
+      "rawValue": "SPC\n0200\n1\nCH3908704016075473007\nK\nRobert Schneider AG\nRue du Lac 1268\n2501 Biel\n\n\nCH\n\n\n\n\n\n\n\n5923.50\nCHF\nK\nPia-Maria Rutschmann-Schnyder\nGrosse Marktgasse 28\n9400 Rorschach\n\n\nCH\nSCOR\nRF9720200227JS\n20200227JS- - \nEPD\n\n"
+    }
+  ]
+}

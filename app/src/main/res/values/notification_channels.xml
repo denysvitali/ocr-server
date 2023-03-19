@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_id">ocr_service_channel</string>
+    <string name="channel_name">OCR Service Channel</string>
+    <string name="channel_description">Used to keep the OCR Server running</string>
+</resources>

@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">OCR Server</string>
+    <string name="welcome_text">OCR Server</string>
+</resources>
