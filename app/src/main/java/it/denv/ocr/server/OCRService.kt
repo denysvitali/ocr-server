@@ -4,8 +4,11 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.BitmapFactory
+import android.os.BatteryManager
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -19,13 +22,17 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import io.ktor.content.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
+import it.denv.ocr.server.responses.BatteryState
+import it.denv.ocr.server.responses.BatteryStatus
 import it.denv.ocr.server.responses.OcrResultProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -60,10 +67,8 @@ class OCRService : Service() {
 
         // Notice start
         val notification: Notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("OCR Service")
-            .setContentText("Running on ${ip}:${port}")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .build()
+            .setContentTitle("OCR Service").setContentText("Running on ${ip}:${port}")
+            .setSmallIcon(R.drawable.ic_launcher_foreground).build()
         startForeground(NOTIFICATION_ID, notification)
         Log.d(TAG, "Service starting...")
         return super.onStartCommand(intent, flags, startId)
@@ -90,8 +95,7 @@ class OCRService : Service() {
 
         val environment = applicationEngineEnvironment {
             log = LoggerFactory.getLogger("ktor")
-            sslConnector(
-                keyStore = keyStore,
+            sslConnector(keyStore = keyStore,
                 keyAlias = "alias",
                 keyStorePassword = { "changeit".toCharArray() },
                 privateKeyPassword = { "changeit".toCharArray() }) {
@@ -104,84 +108,103 @@ class OCRService : Service() {
                     call.response.header(HttpHeaders.AccessControlAllowHeaders, "*")
                     call.response.header(HttpHeaders.AccessControlAllowMethods, "*")
                 }
+
+                install(ContentNegotiation) {
+                    json(Json {
+                        prettyPrint = true
+                        isLenient = true
+                    })
+                }
+
                 routing {
                     get("/healthz", healthz())
                     post("/api/v1/ocr", handleOcr())
+                    get("/api/v1/battery", handleBattery())
                 }
             }
         }
         embeddedServer(Netty, environment).start(wait = true)
     }
 
-    private fun healthz(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit =
-        {
-            call.respond(
-                TextContent(
-                    "OK",
-                    contentType = ContentType.Text.Plain,
-                    status = HttpStatusCode.OK
-                )
+    private fun healthz(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+        call.respond(
+            TextContent(
+                "OK", contentType = ContentType.Text.Plain, status = HttpStatusCode.OK
             )
-        }
+        )
+    }
 
-    private fun handleOcr(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit =
-        {
-            try {
-                val contentType = call.request.contentType()
-                if (contentType.match(ContentType.Image.Any)) {
-                    val inputStream: InputStream = call.receiveStream()
-                    val bis = BufferedInputStream(inputStream)
-                    withContext(Dispatchers.IO) {
-                        val bmp = BitmapFactory.decodeStream(bis)
-                        if (bmp == null) {
-                            Log.e(TAG, "bmp is null")
-                            unableToProcessRequest(call)
-                        } else {
-                            val recognizer: TextRecognizer = TextRecognition.getClient(
-                                TextRecognizerOptions.DEFAULT_OPTIONS
+    private fun handleBattery(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+        val batteryStatus = getBatteryStatus(applicationContext)
+        call.respond(HttpStatusCode.OK, batteryStatus)
+    }
+
+    private fun handleOcr(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+        try {
+            val contentType = call.request.contentType()
+            if (contentType.match(ContentType.Image.Any)) {
+                val inputStream: InputStream = call.receiveStream()
+                val bis = BufferedInputStream(inputStream)
+                withContext(Dispatchers.IO) {
+                    val bmp = BitmapFactory.decodeStream(bis)
+                    if (bmp == null) {
+                        Log.e(TAG, "bmp is null")
+                        unableToProcessRequest(call)
+                    } else {
+                        val recognizer: TextRecognizer = TextRecognition.getClient(
+                            TextRecognizerOptions.DEFAULT_OPTIONS
+                        )
+
+                        val barcodeScannerOptions =
+                            BarcodeScannerOptions.Builder().setBarcodeFormats(
+                                Barcode.FORMAT_QR_CODE, Barcode.FORMAT_AZTEC
+                            ).build()
+
+                        val scanner = BarcodeScanning.getClient(barcodeScannerOptions)
+                        val inputImage = InputImage.fromBitmap(bmp, 0)
+                        val barcodeTask = scanner.process(inputImage)
+                        val ocrTask = recognizer.process(inputImage)
+
+                        val combinedTask = Tasks.whenAllComplete(barcodeTask, ocrTask)
+                        Tasks.await(combinedTask)
+
+                        call.respond(
+                            OcrResultProcessor.process(
+                                barcodeTask.result, ocrTask.result
                             )
-
-                            val barcodeScannerOptions = BarcodeScannerOptions.Builder()
-                                .setBarcodeFormats(
-                                    Barcode.FORMAT_QR_CODE,
-                                    Barcode.FORMAT_AZTEC
-                                )
-                                .build()
-
-                            val scanner = BarcodeScanning.getClient(barcodeScannerOptions)
-                            val inputImage = InputImage.fromBitmap(bmp, 0)
-                            val barcodeTask = scanner.process(inputImage)
-                            val ocrTask = recognizer.process(inputImage)
-
-                            val combinedTask = Tasks.whenAllComplete(barcodeTask, ocrTask)
-                            Tasks.await(combinedTask)
-
-                            val json = Json.encodeToString(
-                                OcrResultProcessor.process(
-                                    barcodeTask.result,
-                                    ocrTask.result
-                                )
-                            )
-                            call.respond(json)
-                        }
+                        )
                     }
-                } else {
-                    call.respond(
-                        status = HttpStatusCode.BadRequest,
-                        "Please specify an image MIME type"
-                    )
                 }
-            } catch (ex: Exception) {
-                Log.e(TAG, "Unhandled exception:", ex)
+            } else {
                 call.respond(
-                    status = HttpStatusCode.InternalServerError,
-                    "Unhandled exception"
+                    status = HttpStatusCode.BadRequest, "Please specify an image MIME type"
                 )
             }
+        } catch (ex: Exception) {
+            Log.e(TAG, "Unhandled exception:", ex)
+            call.respond(
+                status = HttpStatusCode.InternalServerError, "Unhandled exception"
+            )
         }
+    }
 
-    fun module() {
-
+    private fun getBatteryStatus(context: Context): BatteryStatus {
+        val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        val batteryStatusIntent: Intent? =
+            context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val batteryState =
+            when (batteryStatusIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1) {
+                BatteryManager.BATTERY_STATUS_CHARGING -> BatteryState.CHARGING
+                BatteryManager.BATTERY_STATUS_DISCHARGING -> BatteryState.DISCHARGING
+                BatteryManager.BATTERY_STATUS_FULL -> BatteryState.FULL
+                BatteryManager.BATTERY_STATUS_NOT_CHARGING -> BatteryState.NOT_CHARGING
+                else -> BatteryState.UNKNOWN
+            }
+        return BatteryStatus(
+            state = batteryState,
+            level = batteryLevel
+        )
     }
 
     private fun getIpAddr(): Array<String> {
