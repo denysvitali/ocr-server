@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+/app/src/main/res/raw/*.pem
+/app/src/main/res/raw/*.p12

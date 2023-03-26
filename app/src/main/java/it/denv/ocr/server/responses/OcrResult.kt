@@ -17,7 +17,6 @@ class OcrResultProcessor {
         fun process(barcodes: MutableList<Barcode>, ocrResult: Text): OcrResult {
             val textBlocks = mutableListOf<TextBlock>()
             for (tb in ocrResult.textBlocks) {
-                val bb = tb.boundingBox
                 textBlocks.add(
                     TextBlock(
                         text = tb.text,

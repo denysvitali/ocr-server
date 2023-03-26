@@ -12,6 +12,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import java.security.Security
 
 const val TAG = "OCR_Server"
 
@@ -20,9 +22,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.main)
 
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            checkNotificationPermission()
-        }
+        checkNotificationPermission()
+
+        System.setProperty("javax.net.debug", "ssl")
 
         val tvServiceStatus: TextView = findViewById(R.id.tv_service_status)
         tvServiceStatus.text = "Starting service..."
@@ -33,7 +35,6 @@ class MainActivity : AppCompatActivity() {
         tvServiceStatus.text = "Service started"
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkNotificationPermission() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (nm.areNotificationsEnabled()) {

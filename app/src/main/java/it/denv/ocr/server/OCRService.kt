@@ -25,6 +25,7 @@ import io.ktor.server.netty.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
 import it.denv.ocr.server.responses.OcrResultProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -32,10 +33,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.slf4j.LoggerFactory
 import java.io.BufferedInputStream
+import java.io.File
 import java.io.InputStream
 import java.net.NetworkInterface
 import java.net.SocketException
+import java.security.KeyStore
 import java.util.*
 
 
@@ -48,7 +53,7 @@ class OCRService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         setupNotificationChannels()
         val ip = getIpAddr().joinToString(",")
-        val port = 8080
+        val port = 8443
         GlobalScope.launch {
             start(port).run {}
         }
@@ -68,80 +73,115 @@ class OCRService : Service() {
         call.respond(HttpStatusCode.InternalServerError, "Unable to process request")
     }
 
-    private suspend fun start(port: Int) {
-        embeddedServer(Netty, port = port) {
-            intercept(ApplicationCallPipeline.Plugins) {
-                call.response.header(HttpHeaders.AccessControlAllowOrigin, "*")
-                call.response.header(HttpHeaders.AccessControlAllowHeaders, "*")
-                call.response.header(HttpHeaders.AccessControlAllowMethods, "*")
-            }
-            routing {
+    private fun start(serverPort: Int) {
+        val keyStoreResource = resources.openRawResource(R.raw.keystore)
+        val keyStoreFile = File.createTempFile("keystore", ".p12")
+        keyStoreFile.deleteOnExit()
+        keyStoreResource.copyTo(keyStoreFile.outputStream())
 
-                get("/healthz") {
+
+        val keyStore = KeyStore.Builder.newInstance(
+            "PKCS12",
+            BouncyCastleProvider(),
+            keyStoreFile,
+            KeyStore.PasswordProtection("changeit".toCharArray())
+        ).keyStore
+
+
+        val environment = applicationEngineEnvironment {
+            log = LoggerFactory.getLogger("ktor")
+            sslConnector(
+                keyStore = keyStore,
+                keyAlias = "alias",
+                keyStorePassword = { "changeit".toCharArray() },
+                privateKeyPassword = { "changeit".toCharArray() }) {
+                port = serverPort
+                keyStorePath = File(filesDir, "keystore.p12")
+            }
+            module {
+                intercept(ApplicationCallPipeline.Plugins) {
+                    call.response.header(HttpHeaders.AccessControlAllowOrigin, "*")
+                    call.response.header(HttpHeaders.AccessControlAllowHeaders, "*")
+                    call.response.header(HttpHeaders.AccessControlAllowMethods, "*")
+                }
+                routing {
+                    get("/healthz", healthz())
+                    post("/api/v1/ocr", handleOcr())
+                }
+            }
+        }
+        embeddedServer(Netty, environment).start(wait = true)
+    }
+
+    private fun healthz(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit =
+        {
+            call.respond(
+                TextContent(
+                    "OK",
+                    contentType = ContentType.Text.Plain,
+                    status = HttpStatusCode.OK
+                )
+            )
+        }
+
+    private fun handleOcr(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit =
+        {
+            try {
+                val contentType = call.request.contentType()
+                if (contentType.match(ContentType.Image.Any)) {
+                    val inputStream: InputStream = call.receiveStream()
+                    val bis = BufferedInputStream(inputStream)
+                    withContext(Dispatchers.IO) {
+                        val bmp = BitmapFactory.decodeStream(bis)
+                        if (bmp == null) {
+                            Log.e(TAG, "bmp is null")
+                            unableToProcessRequest(call)
+                        } else {
+                            val recognizer: TextRecognizer = TextRecognition.getClient(
+                                TextRecognizerOptions.DEFAULT_OPTIONS
+                            )
+
+                            val barcodeScannerOptions = BarcodeScannerOptions.Builder()
+                                .setBarcodeFormats(
+                                    Barcode.FORMAT_QR_CODE,
+                                    Barcode.FORMAT_AZTEC
+                                )
+                                .build()
+
+                            val scanner = BarcodeScanning.getClient(barcodeScannerOptions)
+                            val inputImage = InputImage.fromBitmap(bmp, 0)
+                            val barcodeTask = scanner.process(inputImage)
+                            val ocrTask = recognizer.process(inputImage)
+
+                            val combinedTask = Tasks.whenAllComplete(barcodeTask, ocrTask)
+                            Tasks.await(combinedTask)
+
+                            val json = Json.encodeToString(
+                                OcrResultProcessor.process(
+                                    barcodeTask.result,
+                                    ocrTask.result
+                                )
+                            )
+                            call.respond(json)
+                        }
+                    }
+                } else {
                     call.respond(
-                        TextContent(
-                            "OK",
-                            contentType = ContentType.Text.Plain,
-                            status = HttpStatusCode.OK
-                        )
+                        status = HttpStatusCode.BadRequest,
+                        "Please specify an image MIME type"
                     )
                 }
-                post("/api/v1/ocr") {
-                    try {
-                        val contentType = call.request.contentType()
-                        val mime = contentType.toString()
-                        if (contentType.match(ContentType.Image.Any)) {
-                            val inputStream: InputStream = call.receiveStream()
-                            val bis = BufferedInputStream(inputStream)
-                            withContext(Dispatchers.IO) {
-                                val bmp = BitmapFactory.decodeStream(bis)
-                                if (bmp == null) {
-                                    Log.e(TAG, "bmp is null")
-                                    unableToProcessRequest(call)
-                                } else {
-                                    val recognizer: TextRecognizer = TextRecognition.getClient(
-                                        TextRecognizerOptions.DEFAULT_OPTIONS
-                                    )
-
-                                    val barcodeScannerOptions = BarcodeScannerOptions.Builder()
-                                        .setBarcodeFormats(
-                                            Barcode.FORMAT_QR_CODE,
-                                            Barcode.FORMAT_AZTEC)
-                                        .build()
-
-                                    val scanner = BarcodeScanning.getClient(barcodeScannerOptions)
-                                    val inputImage = InputImage.fromBitmap(bmp, 0)
-                                    val barcodeTask = scanner.process(inputImage)
-                                    val ocrTask = recognizer.process(inputImage)
-
-                                    val combinedTask = Tasks.whenAllComplete(barcodeTask, ocrTask)
-                                    Tasks.await(combinedTask)
-
-                                    val json = Json.encodeToString(
-                                        OcrResultProcessor.process(
-                                            barcodeTask.result,
-                                            ocrTask.result
-                                        )
-                                    )
-                                    call.respond(json)
-                                }
-                            }
-                        } else {
-                            call.respond(
-                                status = HttpStatusCode.BadRequest,
-                                "Please specify an image MIME type"
-                            )
-                        }
-                    } catch (ex: Exception) {
-                        Log.e(TAG, "Unhandled exception:", ex)
-                        call.respond(
-                            status = HttpStatusCode.InternalServerError,
-                            "Unhandled exception"
-                        )
-                    }
-                }
+            } catch (ex: Exception) {
+                Log.e(TAG, "Unhandled exception:", ex)
+                call.respond(
+                    status = HttpStatusCode.InternalServerError,
+                    "Unhandled exception"
+                )
             }
-        }.start(wait = true)
+        }
+
+    fun module() {
+
     }
 
     private fun getIpAddr(): Array<String> {
@@ -152,7 +192,7 @@ class OCRService : Service() {
             for (intf in interfaces) {
                 val addrs = Collections.list(intf.inetAddresses)
                 for (addr in addrs) {
-                    if(addr.hostAddress != null) {
+                    if (addr.hostAddress != null) {
                         if (!addr.isLoopbackAddress && addr.hostAddress!!.indexOf(':') < 0) {
                             ips.add(addr.hostAddress!!)
                         }
