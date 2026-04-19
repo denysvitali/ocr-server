@@ -7,9 +7,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.os.BatteryManager
 import android.os.IBinder
+import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.tasks.Tasks
@@ -20,27 +22,30 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import io.ktor.content.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import it.denv.ocr.server.responses.BatteryState
 import it.denv.ocr.server.responses.BatteryStatus
 import it.denv.ocr.server.responses.OcrResultProcessor
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import org.slf4j.LoggerFactory
 import java.io.BufferedInputStream
 import java.io.File
@@ -52,44 +57,65 @@ import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.Security
-import java.util.*
 import java.security.cert.X509Certificate
-import org.bouncycastle.x509.X509V3CertificateGenerator
-import javax.security.auth.x500.X500Principal
+import java.util.Collections
+import java.util.Date
 
 
 class OCRService : Service() {
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var server: EmbeddedServer<*, *>? = null
+
     override fun onBind(p0: Intent?): IBinder? {
-        // Not used
         return null
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         setupNotificationChannels()
         val ip = getIpAddr().joinToString(",")
-        val port = 8443
-        GlobalScope.launch {
-            start(port).run {}
+
+        serviceScope.launch {
+            start(SERVER_PORT)
         }
 
-        // Notice start
         val notification: Notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("OCR Service").setContentText("Running on ${ip}:${port}")
+            .setContentTitle("OCR Service").setContentText("Running on ${ip}:${SERVER_PORT}")
             .setSmallIcon(R.drawable.ic_launcher_foreground).build()
         startForeground(NOTIFICATION_ID, notification)
         Log.d(TAG, "Service starting...")
         return super.onStartCommand(intent, flags, startId)
     }
 
+    override fun onDestroy() {
+        server?.stop(1000, 2000)
+        serviceScope.cancel()
+        super.onDestroy()
+        Log.d(TAG, "Service destroyed")
+    }
+
     private suspend fun unableToProcessRequest(call: ApplicationCall) {
         call.respond(HttpStatusCode.InternalServerError, "Unable to process request")
+    }
+
+    private fun getOrGeneratePassword(): CharArray {
+        val prefs = getSharedPreferences("ocr_server_prefs", Context.MODE_PRIVATE)
+        val existing = prefs.getString("keystore_password", null)
+        if (existing != null) {
+            return existing.toCharArray()
+        }
+
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        val password = Base64.encodeToString(bytes, Base64.NO_WRAP)
+        prefs.edit().putString("keystore_password", password).apply()
+        return password.toCharArray()
     }
 
     private fun start(serverPort: Int) {
         Security.addProvider(BouncyCastleProvider())
 
         val keyStoreFile = File(filesDir, "keystore.p12")
-        val password = "changeit".toCharArray()
+        val password = getOrGeneratePassword()
 
         if (!keyStoreFile.exists()) {
             generateSelfSignedCert(keyStoreFile, password)
@@ -102,21 +128,21 @@ class OCRService : Service() {
             KeyStore.PasswordProtection(password)
         ).keyStore
 
-
         val environment = applicationEngineEnvironment {
             log = LoggerFactory.getLogger("ktor")
             sslConnector(keyStore = keyStore,
                 keyAlias = "alias",
-                keyStorePassword = { "changeit".toCharArray() },
-                privateKeyPassword = { "changeit".toCharArray() }) {
+                keyStorePassword = { password },
+                privateKeyPassword = { password }) {
                 port = serverPort
                 keyStorePath = File(filesDir, "keystore.p12")
             }
             module {
-                intercept(ApplicationCallPipeline.Plugins) {
-                    call.response.header(HttpHeaders.AccessControlAllowOrigin, "*")
-                    call.response.header(HttpHeaders.AccessControlAllowHeaders, "*")
-                    call.response.header(HttpHeaders.AccessControlAllowMethods, "*")
+                install(CORS) {
+                    anyHost()
+                    allowHeader(HttpHeaders.ContentType)
+                    allowMethod(HttpMethod.Post)
+                    allowMethod(HttpMethod.Get)
                 }
 
                 install(ContentNegotiation) {
@@ -133,24 +159,29 @@ class OCRService : Service() {
                 }
             }
         }
-        embeddedServer(Netty, environment).start(wait = true)
+        server = embeddedServer(Netty, environment).start(wait = true)
     }
 
-    @Suppress("DEPRECATION")
     private fun generateSelfSignedCert(keyStoreFile: File, password: CharArray) {
         val keyGen = KeyPairGenerator.getInstance("RSA", "BC")
         keyGen.initialize(2048, SecureRandom())
         val keyPair = keyGen.generateKeyPair()
 
-        val certGen = X509V3CertificateGenerator()
-        certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()))
-        certGen.setIssuerDN(X500Principal("CN=OCR Server"))
-        certGen.setSubjectDN(X500Principal("CN=OCR Server"))
-        certGen.setNotBefore(Date(System.currentTimeMillis() - 86400000))
-        certGen.setNotAfter(Date(System.currentTimeMillis() + 365L * 24 * 3600 * 1000 * 10))
-        certGen.setPublicKey(keyPair.public)
-        certGen.setSignatureAlgorithm("SHA256WithRSAEncryption")
-        val cert: X509Certificate = certGen.generate(keyPair.private)
+        val issuer = X500Name("CN=OCR Server")
+        val builder = JcaX509v3CertificateBuilder(
+            issuer,
+            BigInteger.valueOf(System.currentTimeMillis()),
+            Date(System.currentTimeMillis() - 86_400_000L),
+            Date(System.currentTimeMillis() + 365L * 24 * 3600 * 1000 * 10),
+            issuer,
+            keyPair.public
+        )
+        val signer = JcaContentSignerBuilder("SHA256WithRSAEncryption")
+            .setProvider("BC")
+            .build(keyPair.private)
+        val cert: X509Certificate = JcaX509CertificateConverter()
+            .setProvider("BC")
+            .getCertificate(builder.build(signer))
 
         val ks = KeyStore.getInstance("PKCS12", "BC")
         ks.load(null, null)
@@ -175,6 +206,12 @@ class OCRService : Service() {
 
     private fun handleOcr(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
         try {
+            val contentLength = call.request.contentLength() ?: 0L
+            if (contentLength > MAX_UPLOAD_BYTES) {
+                call.respond(HttpStatusCode.RequestEntityTooLarge, "Image must be under 10MB")
+                return@this
+            }
+
             val contentType = call.request.contentType()
             if (contentType.match(ContentType.Image.Any)) {
                 val inputStream: InputStream = call.receiveStream()
@@ -257,7 +294,7 @@ class OCRService : Service() {
                 }
             }
         } catch (e: SocketException) {
-            e.printStackTrace()
+            Log.e(TAG, "Error getting IP addresses", e)
         }
         return ips.toTypedArray()
     }
@@ -277,5 +314,7 @@ class OCRService : Service() {
         const val TAG = "OCRService"
         const val CHANNEL_ID = "ocr_service_channel"
         const val NOTIFICATION_ID = 1
+        const val SERVER_PORT = 8443
+        private const val MAX_UPLOAD_BYTES = 10L * 1024 * 1024
     }
 }

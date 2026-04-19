@@ -5,17 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.Manifest.permission.POST_NOTIFICATIONS
-import android.os.Build
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import java.security.Security
-
-const val TAG = "OCR_Server"
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,8 +17,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.main)
 
         checkNotificationPermission()
-
-        System.setProperty("javax.net.debug", "ssl")
 
         val tvServiceStatus: TextView = findViewById(R.id.tv_service_status)
         tvServiceStatus.text = "Starting service..."

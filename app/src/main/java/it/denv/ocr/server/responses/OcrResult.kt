@@ -37,7 +37,7 @@ class OcrResultProcessor {
             )
         }
 
-        private fun convertToRect(boundingBox: android.graphics.Rect?): Rect? {
+        internal fun convertToRect(boundingBox: android.graphics.Rect?): Rect? {
             if (boundingBox == null) {
                 return null
             }

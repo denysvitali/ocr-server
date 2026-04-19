@@ -12,7 +12,7 @@ to process pictures using the following modules:
 ## Usage
 
 1. Build and Run the Android app
-2. Copy the IP Address and Port from the notification (e.g: `192.168.1.169:8080`)
+2. Copy the IP Address and Port from the notification (e.g: `192.168.1.169:8443`)
 3. Use the API
 
 ### API
