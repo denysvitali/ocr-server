@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace 'it.denv.ocr.server'
-    compileSdk 35
+    compileSdk 36
 
     packaging {
         pickFirst "META-INF/INDEX.LIST"
