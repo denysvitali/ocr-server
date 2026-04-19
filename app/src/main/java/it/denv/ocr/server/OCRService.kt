@@ -113,7 +113,8 @@ class OCRService : Service() {
     }
 
     private fun start(serverPort: Int) {
-        Security.addProvider(BouncyCastleProvider())
+        Security.removeProvider("BC")
+        Security.insertProviderAt(BouncyCastleProvider(), 1)
 
         val keyStoreFile = File(filesDir, "keystore.p12")
         val password = getOrGeneratePassword()
