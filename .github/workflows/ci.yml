@@ -31,22 +31,21 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Restore keystores
+      - name: Restore keystore
         run: |
           mkdir -p app/src/main/res/raw
-          echo "$SSL_KEYSTORE_BASE64" | base64 -d > app/src/main/res/raw/keystore.p12
-          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > release.keystore
+          echo "$KEYSTORE_BASE64" | base64 -d > app/src/main/res/raw/keystore.p12
+          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
         env:
-          SSL_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Build release APK
         run: ./gradlew assembleRelease
         env:
           KEYSTORE_FILE: ${{ github.workspace }}/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
