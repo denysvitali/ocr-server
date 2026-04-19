@@ -75,14 +75,14 @@ class OCRService : Service() {
         setupNotificationChannels()
         val ips = getIpAddr().toList()
         val ip = ips.joinToString(",")
-        ServerStats.markStarted(ips, SERVER_PORT)
+        ServerStats.markStarted(ips, HTTPS_PORT)
 
         serviceScope.launch {
-            start(SERVER_PORT)
+            start(HTTPS_PORT)
         }
 
         val notification: Notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("OCR Service").setContentText("Running on ${ip}:${SERVER_PORT}")
+            .setContentTitle("OCR Service").setContentText("Running on ${ip}:${HTTPS_PORT}")
             .setSmallIcon(R.drawable.ic_launcher_foreground).build()
         startForeground(NOTIFICATION_ID, notification)
         Log.d(TAG, "Service starting...")
@@ -332,7 +332,7 @@ class OCRService : Service() {
         const val TAG = "OCRService"
         const val CHANNEL_ID = "ocr_service_channel"
         const val NOTIFICATION_ID = 1
-        const val SERVER_PORT = 8443
+        const val HTTPS_PORT = 8443
         const val HTTP_PORT = 8080
         private const val MAX_UPLOAD_BYTES = 10L * 1024 * 1024
     }
