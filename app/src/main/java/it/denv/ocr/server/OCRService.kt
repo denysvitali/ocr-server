@@ -23,10 +23,12 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import io.ktor.http.*
+import io.ktor.http.content.TextContent
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -46,7 +48,6 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
-import org.slf4j.LoggerFactory
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
@@ -128,38 +129,42 @@ class OCRService : Service() {
             KeyStore.PasswordProtection(password)
         ).keyStore
 
-        val environment = applicationEngineEnvironment {
-            log = LoggerFactory.getLogger("ktor")
-            sslConnector(keyStore = keyStore,
+        server = embeddedServer(
+            Netty,
+            serverConfig {
+                module {
+                    install(CORS) {
+                        anyHost()
+                        allowHeader(HttpHeaders.ContentType)
+                        allowMethod(HttpMethod.Post)
+                        allowMethod(HttpMethod.Get)
+                    }
+
+                    install(ContentNegotiation) {
+                        json(Json {
+                            prettyPrint = true
+                            isLenient = true
+                        })
+                    }
+
+                    routing {
+                        get("/healthz", healthz())
+                        post("/api/v1/ocr", handleOcr())
+                        get("/api/v1/battery", handleBattery())
+                    }
+                }
+            }
+        ) {
+            sslConnector(
+                keyStore = keyStore,
                 keyAlias = "alias",
                 keyStorePassword = { password },
-                privateKeyPassword = { password }) {
+                privateKeyPassword = { password }
+            ) {
                 port = serverPort
                 keyStorePath = File(filesDir, "keystore.p12")
             }
-            module {
-                install(CORS) {
-                    anyHost()
-                    allowHeader(HttpHeaders.ContentType)
-                    allowMethod(HttpMethod.Post)
-                    allowMethod(HttpMethod.Get)
-                }
-
-                install(ContentNegotiation) {
-                    json(Json {
-                        prettyPrint = true
-                        isLenient = true
-                    })
-                }
-
-                routing {
-                    get("/healthz", healthz())
-                    post("/api/v1/ocr", handleOcr())
-                    get("/api/v1/battery", handleBattery())
-                }
-            }
-        }
-        server = embeddedServer(Netty, environment).start(wait = true)
+        }.start(wait = true)
     }
 
     private fun generateSelfSignedCert(keyStoreFile: File, password: CharArray) {
@@ -191,7 +196,7 @@ class OCRService : Service() {
         Log.d(TAG, "Generated self-signed certificate at ${keyStoreFile.absolutePath}")
     }
 
-    private fun healthz(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+    private fun healthz(): suspend RoutingContext.() -> Unit = {
         call.respond(
             TextContent(
                 "OK", contentType = ContentType.Text.Plain, status = HttpStatusCode.OK
@@ -199,17 +204,17 @@ class OCRService : Service() {
         )
     }
 
-    private fun handleBattery(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+    private fun handleBattery(): suspend RoutingContext.() -> Unit = {
         val batteryStatus = getBatteryStatus(applicationContext)
         call.respond(HttpStatusCode.OK, batteryStatus)
     }
 
-    private fun handleOcr(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+    private fun handleOcr(): suspend RoutingContext.() -> Unit = handler@{
         try {
             val contentLength = call.request.contentLength() ?: 0L
             if (contentLength > MAX_UPLOAD_BYTES) {
                 call.respond(HttpStatusCode.RequestEntityTooLarge, "Image must be under 10MB")
-                return@this
+                return@handler
             }
 
             val contentType = call.request.contentType()
