@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [master]
-    tags: ['v*']
   pull_request:
     branches: [master]
 
@@ -44,18 +43,26 @@ jobs:
       - name: Run lint
         run: ./gradlew lintDebug
 
-      - name: Derive version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Derive next version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         id: appversion
         run: |
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
-          VERSION_NAME="${TAG_NAME#v}"
-          CORE="${VERSION_NAME%%+*}"
-          CORE="${CORE%%-*}"
-          IFS=. read -r MAJOR MINOR PATCH <<<"$CORE"
-          VERSION_CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          git fetch --tags --force
+          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$LAST_TAG" ]; then
+            MAJOR=0; MINOR=0; PATCH=0
+          else
+            CORE="${LAST_TAG#v}"
+            CORE="${CORE%%+*}"
+            CORE="${CORE%%-*}"
+            IFS=. read -r MAJOR MINOR PATCH <<<"$CORE"
+          fi
+          NEW_PATCH=$(( ${PATCH:-0} + 1 ))
+          VERSION_NAME="${MAJOR:-0}.${MINOR:-0}.${NEW_PATCH}"
+          VERSION_CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + NEW_PATCH ))
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Build release APK
         run: ./gradlew assembleRelease
@@ -71,22 +78,15 @@ jobs:
         run: ./gradlew testDebugUnitTest
 
       - name: Upload APK as artifact
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
 
-      - name: Determine version
-        if: startsWith(github.ref, 'refs/tags/v')
-        id: version
-        run: |
-          TAG_NAME="${GITHUB_REF#refs/tags/}"
-          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
-
       - name: Create release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ steps.appversion.outputs.tag }}
           files: app/build/outputs/apk/release/*.apk
