@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import android.graphics.BitmapFactory
 import android.os.BatteryManager
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -66,6 +67,12 @@ import java.util.Date
 class OCRService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var server: EmbeddedServer<*, *>? = null
+    private val wakeLock: PowerManager.WakeLock by lazy {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OCRService:request").apply {
+            setReferenceCounted(true)
+        }
+    }
 
     override fun onBind(p0: Intent?): IBinder? {
         return null
@@ -219,6 +226,7 @@ class OCRService : Service() {
     private fun handleOcr(): suspend RoutingContext.() -> Unit = handler@{
         val startMs = ServerStats.requestStarted()
         var succeeded = false
+        wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS)
         try {
             val contentLength = call.request.contentLength() ?: 0L
             if (contentLength > MAX_UPLOAD_BYTES) {
@@ -274,6 +282,7 @@ class OCRService : Service() {
             )
         } finally {
             if (!succeeded) ServerStats.requestFailed()
+            if (wakeLock.isHeld) wakeLock.release()
         }
     }
 
@@ -335,5 +344,6 @@ class OCRService : Service() {
         const val HTTPS_PORT = 8443
         const val HTTP_PORT = 8080
         private const val MAX_UPLOAD_BYTES = 10L * 1024 * 1024
+        private const val WAKE_LOCK_TIMEOUT_MS = 30_000L
     }
 }
