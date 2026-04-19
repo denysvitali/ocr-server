@@ -213,7 +213,7 @@ class OCRService : Service() {
         try {
             val contentLength = call.request.contentLength() ?: 0L
             if (contentLength > MAX_UPLOAD_BYTES) {
-                call.respond(HttpStatusCode.RequestEntityTooLarge, "Image must be under 10MB")
+                call.respond(HttpStatusCode.PayloadTooLarge, "Image must be under 10MB")
                 return@handler
             }
 
