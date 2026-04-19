@@ -43,26 +43,41 @@ jobs:
       - name: Run lint
         run: ./gradlew lintDebug
 
-      - name: Derive next version
+      - name: Install git-cliff
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: Compute next version
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         id: appversion
         run: |
           git fetch --tags --force
-          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
-          if [ -z "$LAST_TAG" ]; then
-            MAJOR=0; MINOR=0; PATCH=0
+          CURRENT_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          [ -z "$CURRENT_TAG" ] && CURRENT_TAG="v0.0.0"
+          NEXT_TAG=$(git cliff --bumped-version 2>/dev/null | tail -n1 | tr -d '[:space:]' || true)
+          if [ -z "$NEXT_TAG" ] || [ "$NEXT_TAG" = "$CURRENT_TAG" ]; then
+            RELEASE=false
+            VERSION_NAME="${CURRENT_TAG#v}"
+            TAG="$CURRENT_TAG"
           else
-            CORE="${LAST_TAG#v}"
-            CORE="${CORE%%+*}"
-            CORE="${CORE%%-*}"
-            IFS=. read -r MAJOR MINOR PATCH <<<"$CORE"
+            RELEASE=true
+            VERSION_NAME="${NEXT_TAG#v}"
+            TAG="$NEXT_TAG"
           fi
-          NEW_PATCH=$(( ${PATCH:-0} + 1 ))
-          VERSION_NAME="${MAJOR:-0}.${MINOR:-0}.${NEW_PATCH}"
-          VERSION_CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + NEW_PATCH ))
+          CORE="${VERSION_NAME%%+*}"
+          CORE="${CORE%%-*}"
+          IFS=. read -r MAJOR MINOR PATCH <<<"$CORE"
+          VERSION_CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          echo "release=${RELEASE}" >> "$GITHUB_OUTPUT"
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        if: steps.appversion.outputs.release == 'true'
+        run: git cliff --unreleased --tag "${{ steps.appversion.outputs.tag }}" --strip all -o RELEASE_NOTES.md
 
       - name: Build release APK
         run: ./gradlew assembleRelease
@@ -78,15 +93,16 @@ jobs:
         run: ./gradlew testDebugUnitTest
 
       - name: Upload APK as artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: steps.appversion.outputs.release == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
 
       - name: Create release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: steps.appversion.outputs.release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.appversion.outputs.tag }}
+          body_path: RELEASE_NOTES.md
           files: app/build/outputs/apk/release/*.apk
