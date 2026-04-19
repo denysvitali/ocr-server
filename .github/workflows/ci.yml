@@ -3,15 +3,15 @@ name: CI
 on:
   push:
     branches: [master]
+    tags: ['v*']
   pull_request:
     branches: [master]
-
-permissions:
-  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -41,43 +41,36 @@ jobs:
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
 
+      - name: Run lint
+        run: ./gradlew lintDebug
+
       - name: Build release APK
         run: ./gradlew assembleRelease
         env:
           KEYSTORE_FILE: ${{ github.workspace }}/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_ALIAS: release
           KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
 
       - name: Upload APK as artifact
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
 
       - name: Determine version
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/v')
         id: version
         run: |
-          LATEST=$(git tag -l 'v*' --sort=-version:refname | head -1)
-          if [ -z "$LATEST" ]; then
-            VERSION="0.1.0"
-          else
-            BASE="${LATEST%%+*}"
-            MAJOR=$(echo "$BASE" | sed 's/^v//' | cut -d. -f1)
-            MINOR=$(echo "$BASE" | sed 's/^v//' | cut -d. -f2)
-            PATCH=$(echo "$BASE" | sed 's/^v//' | cut -d. -f3)
-            PATCH=$((PATCH + 1))
-            VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          fi
-          echo "tag=v${VERSION}+${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Create release
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
