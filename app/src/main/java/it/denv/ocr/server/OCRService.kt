@@ -73,7 +73,9 @@ class OCRService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         setupNotificationChannels()
-        val ip = getIpAddr().joinToString(",")
+        val ips = getIpAddr().toList()
+        val ip = ips.joinToString(",")
+        ServerStats.markStarted(ips, SERVER_PORT)
 
         serviceScope.launch {
             start(SERVER_PORT)
@@ -90,6 +92,7 @@ class OCRService : Service() {
     override fun onDestroy() {
         server?.stop(1000, 2000)
         serviceScope.cancel()
+        ServerStats.markStopped()
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
     }
@@ -211,6 +214,8 @@ class OCRService : Service() {
     }
 
     private fun handleOcr(): suspend RoutingContext.() -> Unit = handler@{
+        val startMs = ServerStats.requestStarted()
+        var succeeded = false
         try {
             val contentLength = call.request.contentLength() ?: 0L
             if (contentLength > MAX_UPLOAD_BYTES) {
@@ -250,6 +255,8 @@ class OCRService : Service() {
                                 barcodeTask.result, ocrTask.result
                             )
                         )
+                        succeeded = true
+                        ServerStats.requestSucceeded(startMs, contentLength)
                     }
                 }
             } else {
@@ -262,6 +269,8 @@ class OCRService : Service() {
             call.respond(
                 status = HttpStatusCode.InternalServerError, "Unhandled exception"
             )
+        } finally {
+            if (!succeeded) ServerStats.requestFailed()
         }
     }
 
