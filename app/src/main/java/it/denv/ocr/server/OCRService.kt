@@ -50,6 +50,7 @@ import java.net.NetworkInterface
 import java.net.SocketException
 import java.security.KeyPairGenerator
 import java.security.KeyStore
+import java.security.SecureRandom
 import java.security.Security
 import java.util.*
 import java.security.cert.X509Certificate
@@ -159,7 +160,7 @@ class OCRService : Service() {
         Log.d(TAG, "Generated self-signed certificate at ${keyStoreFile.absolutePath}")
     }
 
-(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+    private fun healthz(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
         call.respond(
             TextContent(
                 "OK", contentType = ContentType.Text.Plain, status = HttpStatusCode.OK
