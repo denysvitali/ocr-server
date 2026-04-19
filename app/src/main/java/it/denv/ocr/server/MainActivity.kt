@@ -3,8 +3,10 @@ package it.denv.ocr.server
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.Manifest.permission.POST_NOTIFICATIONS
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +28,7 @@ class MainActivity : AppCompatActivity() {
         startService(Intent(this, OCRService::class.java))
 
         val tvStatus: TextView = findViewById(R.id.tv_service_status)
+        val statusDot: View = findViewById(R.id.status_dot)
         val tvUrls: TextView = findViewById(R.id.tv_urls)
         val tvUptime: TextView = findViewById(R.id.tv_uptime)
         val tvProcessed: TextView = findViewById(R.id.tv_processed)
@@ -39,11 +42,17 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     ServerStats.state.collect { s ->
-                        tvStatus.text = if (s.running) "● Running" else "○ Stopped"
+                        tvStatus.text = if (s.running) "Running" else "Stopped"
+                        val dotColor = getColor(
+                            if (s.running) R.color.status_dot_on else R.color.status_dot_off
+                        )
+                        statusDot.backgroundTintList = ColorStateList.valueOf(dotColor)
                         tvUrls.text = if (s.ips.isEmpty()) {
-                            "https://<device-ip>:${s.port}"
+                            "https://<device-ip>:${s.port}\nhttp://<device-ip>:${OCRService.HTTP_PORT}"
                         } else {
-                            s.ips.joinToString("\n") { ip -> "https://$ip:${s.port}" }
+                            s.ips.joinToString("\n") { ip ->
+                                "https://$ip:${s.port}\nhttp://$ip:${OCRService.HTTP_PORT}"
+                            }
                         }
                         tvProcessed.text = s.processed.toString()
                         tvInFlight.text = s.inFlight.toString()

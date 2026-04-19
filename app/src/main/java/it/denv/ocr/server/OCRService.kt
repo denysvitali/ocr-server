@@ -159,6 +159,9 @@ class OCRService : Service() {
                 }
             }
         ) {
+            connector {
+                port = HTTP_PORT
+            }
             sslConnector(
                 keyStore = keyStore,
                 keyAlias = "alias",
@@ -330,6 +333,7 @@ class OCRService : Service() {
         const val CHANNEL_ID = "ocr_service_channel"
         const val NOTIFICATION_ID = 1
         const val SERVER_PORT = 8443
+        const val HTTP_PORT = 8080
         private const val MAX_UPLOAD_BYTES = 10L * 1024 * 1024
     }
 }
