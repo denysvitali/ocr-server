@@ -15,6 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -57,9 +59,26 @@ jobs:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
 
+      - name: Determine version
+        if: github.event_name == 'push'
+        id: version
+        run: |
+          LATEST=$(git tag -l 'v*' --sort=-version:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            VERSION="0.1.0"
+          else
+            BASE="${LATEST%%+*}"
+            MAJOR=$(echo "$BASE" | sed 's/^v//' | cut -d. -f1)
+            MINOR=$(echo "$BASE" | sed 's/^v//' | cut -d. -f2)
+            PATCH=$(echo "$BASE" | sed 's/^v//' | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          echo "tag=v${VERSION}+${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       - name: Create release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
+          tag_name: ${{ steps.version.outputs.tag }}
           files: app/build/outputs/apk/release/*.apk
