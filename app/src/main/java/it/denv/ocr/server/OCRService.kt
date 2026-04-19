@@ -45,10 +45,16 @@ import org.slf4j.LoggerFactory
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
+import java.math.BigInteger
 import java.net.NetworkInterface
 import java.net.SocketException
+import java.security.KeyPairGenerator
 import java.security.KeyStore
+import java.security.Security
 import java.util.*
+import java.security.cert.X509Certificate
+import org.bouncycastle.x509.X509V3CertificateGenerator
+import javax.security.auth.x500.X500Principal
 
 
 class OCRService : Service() {
@@ -79,17 +85,20 @@ class OCRService : Service() {
     }
 
     private fun start(serverPort: Int) {
-        val keyStoreResource = resources.openRawResource(R.raw.keystore)
-        val keyStoreFile = File.createTempFile("keystore", ".p12")
-        keyStoreFile.deleteOnExit()
-        keyStoreResource.copyTo(keyStoreFile.outputStream())
+        Security.addProvider(BouncyCastleProvider())
 
+        val keyStoreFile = File(filesDir, "keystore.p12")
+        val password = "changeit".toCharArray()
+
+        if (!keyStoreFile.exists()) {
+            generateSelfSignedCert(keyStoreFile, password)
+        }
 
         val keyStore = KeyStore.Builder.newInstance(
             "PKCS12",
             BouncyCastleProvider(),
             keyStoreFile,
-            KeyStore.PasswordProtection("changeit".toCharArray())
+            KeyStore.PasswordProtection(password)
         ).keyStore
 
 
@@ -126,7 +135,31 @@ class OCRService : Service() {
         embeddedServer(Netty, environment).start(wait = true)
     }
 
-    private fun healthz(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
+    @Suppress("DEPRECATION")
+    private fun generateSelfSignedCert(keyStoreFile: File, password: CharArray) {
+        val keyGen = KeyPairGenerator.getInstance("RSA", "BC")
+        keyGen.initialize(2048, SecureRandom())
+        val keyPair = keyGen.generateKeyPair()
+
+        val certGen = X509V3CertificateGenerator()
+        certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()))
+        certGen.setIssuerDN(X500Principal("CN=OCR Server"))
+        certGen.setSubjectDN(X500Principal("CN=OCR Server"))
+        certGen.setNotBefore(Date(System.currentTimeMillis() - 86400000))
+        certGen.setNotAfter(Date(System.currentTimeMillis() + 365L * 24 * 3600 * 1000 * 10))
+        certGen.setPublicKey(keyPair.public)
+        certGen.setSignatureAlgorithm("SHA256WithRSAEncryption")
+        val cert: X509Certificate = certGen.generate(keyPair.private)
+
+        val ks = KeyStore.getInstance("PKCS12", "BC")
+        ks.load(null, null)
+        ks.setKeyEntry("alias", keyPair.private, password, arrayOf(cert))
+        keyStoreFile.outputStream().use { ks.store(it, password) }
+
+        Log.d(TAG, "Generated self-signed certificate at ${keyStoreFile.absolutePath}")
+    }
+
+(): suspend PipelineContext<Unit, ApplicationCall>.(Unit) -> Unit = {
         call.respond(
             TextContent(
                 "OK", contentType = ContentType.Text.Plain, status = HttpStatusCode.OK

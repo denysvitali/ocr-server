@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-KEYSTORE_FILE="$(dirname "$0")/../app/src/main/res/raw/keystore.p12"
+KEYSTORE_FILE="$(dirname "$0")/../release.keystore"
 PASSWORD="changeit"
-ALIAS="alias"
+ALIAS="release"
 VALIDITY=36500
-
-mkdir -p "$(dirname "$KEYSTORE_FILE")"
 
 keytool -genkeypair \
   -alias "$ALIAS" \
@@ -20,12 +18,12 @@ keytool -genkeypair \
   -dname "CN=OCR Server,OU=Dev,O=Dev,L=Zurich,ST=Zurich,C=CH"
 
 echo ""
-echo "Keystore generated at: $KEYSTORE_FILE"
+echo "Signing keystore generated at: $KEYSTORE_FILE"
 echo ""
 echo "Store the GitHub secrets:"
 echo ""
-echo "  gh secret set KEYSTORE_BASE64 < <(base64 -w0 \"$KEYSTORE_FILE\")"
-echo "  gh secret set KEYSTORE_PASSWORD -b \"$PASSWORD\""
-echo "  gh secret set KEY_ALIAS -b \"$ALIAS\""
-echo "  gh secret set KEY_PASSWORD -b \"$PASSWORD\""
+echo "  gh secret set SIGNING_KEYSTORE_BASE64 < <(base64 -w0 \"$KEYSTORE_FILE\")"
+echo "  gh secret set SIGNING_KEYSTORE_PASSWORD -b \"$PASSWORD\""
+echo "  gh secret set SIGNING_KEY_ALIAS -b \"$ALIAS\""
+echo "  gh secret set SIGNING_KEY_PASSWORD -b \"$PASSWORD\""
 echo ""
